@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, ScrollView, StyleSheet, View, Button, TouchableWithoutFeedback } from 'react-native';
+import { Text, ScrollView, StyleSheet, View, Button, TouchableWithoutFeedback,
+  AlertIOS } from 'react-native';
 import {listen,fire} from "../state";
 import Slider from "react-native-slider";
 
@@ -20,6 +21,7 @@ export default class MediasScreen extends React.Component {
     this.onPause = this.onPause.bind(this);
     this.onRepeat = this.onRepeat.bind(this);
   }
+
   onSlide(value){
     fire({ type: "volume", volume: value });
     if ( this.timeout )
@@ -29,19 +31,117 @@ export default class MediasScreen extends React.Component {
       this.setState({ slideValue: undefined });
     },500);
   }
+
   onStop(){
     fire({ type: "arquivo-stop" });
-
   }
+
   onPlay(){
     fire({ type: "arquivo-play", path: this.state.selected });
-
   }
+
   onPause(){
     fire({ type: "arquivo-pause" });
   }
+
   onRepeat(){
     fire({ type: "repeat" });
+  }
+
+  onLongPress(arquivo) {
+    AlertIOS.alert(
+      arquivo.nome,
+      arquivo.path,
+      [
+        {
+          text: 'Cancel',
+          onPress: () => {},
+          style: 'cancel',
+        },
+        {
+          text: 'Renomear',
+          onPress:() => this.onEditarNome(arquivo)
+        },
+        {
+          text: 'Remover',
+          onPress: () => this.onRemoverArquivo(arquivo),
+        },
+        {
+          text: 'Reordenar',
+          onPress: () => this.onReordenar(arquivo),
+        }
+      ]
+    );
+  }
+
+  onReordenar(arquivo) {
+
+    const arquivos = this.state
+      .appState
+      .arquivos
+      .filter(c=>c.path!=arquivo.path);
+    AlertIOS.alert(
+      arquivo.nome,
+      'Onde?',
+      [ 
+        {
+          text: 'Cancel',
+          onPress: () => {},
+          style: 'cancel',
+        },
+        ...arquivos
+          .map((arquivo2,i)=>({
+            text: (i+1)+') '+(i == 0 ? 'Primeiro arquivo. Antes de "'+arquivo2.nome+'"':
+            'Entre "' + arquivos[i-1].nome + '" e "'+ arquivo2.nome+'"' ),
+            onPress: () => {
+              const sort = [...arquivos.filter((c,j)=>j<i).map(c=>c.path),
+                arquivo.path,
+                ...arquivos.filter((c,j)=>j>=i).map(c=>c.path)
+              ];
+              fire({ type: "arquivos-sort", sort });
+            }
+          }))
+        ,
+        {
+          text: (arquivos.length+1)+') Última arquivo. Depois de "'+arquivos[arquivos.length-1].nome+'"',
+          onPress: () => {
+            fire({ type: "arquivos-sort", sort: [...arquivos.map(c=>c.path), arquivo.path ] });
+          }
+        }
+      ]
+    );
+  }
+
+  onRemoverArquivo(arquivo){
+    AlertIOS.alert(arquivo.nome,'Tem certeza que deseja remover o arquivo?',[
+      {text:'Cancel',onPress:()=>{}},
+      {
+        text: 'Remover',
+        onPress: ()=> fire({ type: "remove-arquivo", path: arquivo.path })
+      }
+    ]);
+    
+  }
+
+  onEditarNome(arquivo){
+
+    AlertIOS.prompt(
+      arquivo.nome,
+      'Novo nome:',
+      [
+        {
+          text: 'Cancel',
+          onPress: () => {},
+          style: 'cancel',
+        },
+        {
+          text: 'Salvar',
+          onPress: (nome) => fire({ type: "editar-arquivo-nome", path: arquivo.path, nome })
+        }
+      ],
+      'plain-text',
+      arquivo.nome
+    );
   }
 
   render() {
@@ -101,6 +201,8 @@ export default class MediasScreen extends React.Component {
       <ScrollView style={{flex:1}}>
         {this.state.appState && this.state.appState.arquivos && this.state.appState.arquivos.map(a=>
         <TouchableWithoutFeedback key={a.path} 
+          key={a.path}
+          onLongPress={()=>this.onLongPress(a)}
           onPress={()=>this.setState({selected: this.state.selected == a.path  ? undefined : a.path})}>
           <View style={a.path == this.state.selected ? styles.selectedArquivo : styles.arquivo} >
           <Text style={{

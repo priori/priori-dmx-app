@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {listen, fire} from "../state";
 import Slider from "../components/VerticalSlider";
+import Mapa from '../components/Mapa';
 
 function tipoColor(tipo){
   return tipo == 'red' ? 'red' :
@@ -224,11 +225,11 @@ class Equipamento extends React.Component {
     const tipo = this.props.fullState.equipamentoTipos.filter(e=>e.uid == equipamento.tipoUid)[0] || null;
     return <View 
       style={this.props.first ? styles.equipamento : styles.equipamentoNotFirst}>
+      <TouchableWithoutFeedback onLongPress={()=>this.onPressNome()}>
       <View style={{height:40,padding:7}}>
-      <TouchableWithoutFeedback onPress={()=>this.onPressNome()}>
         <Text style={{fontSize:20}}>{equipamento.nome}</Text>
-        </TouchableWithoutFeedback>
       </View>
+        </TouchableWithoutFeedback>
       <View style={{flex:1,flexDirection:'row'}}>
         {tipo.canais.map((c,k)=>{
         
@@ -260,7 +261,9 @@ export default class EquipamentosScreen extends React.Component {
   constructor(props){
     super(props);
     this.state = {isScrollEnable:true};
-    this.l = listen(state=> this.setState({appState: state }));
+    this.l = listen(state=> this.setState({appState: state,
+      selected: [],
+      selections: [] }));
   }
 
   componentWillUnmount(){
@@ -269,26 +272,49 @@ export default class EquipamentosScreen extends React.Component {
   
 
   render() {
+
+    if ( !this.state.appState )return null;
+
+    let equipamentos = this.state.appState.equipamentos;
+    const rowsCount = equipamentos.map(e=>e.row).reduce((a,b)=>!a ? b : !b? a : a > b ? a : b ) || 0;
+    const colsCount = equipamentos.map(e=>e.col).reduce((a,b)=>!a ? b : !b? a : a > b ? a : b ) || 0;
+    const semPosicaoCount = this.state.appState.equipamentos.filter(e=>typeof e.row == 'undefined' && typeof e.col == 'undefined').length;
+
+    const mapa = [];
+    const rows = [];
+    for (let c = 0; c < rowsCount; c++) {
+      const row = [];
+      for ( let c2=0; c2 <colsCount; c2++ ){
+        row.push( equipamentos.filter(e=>e.row == c+1 && e.col == c2 + 1).length );
+      }
+      mapa.push(row);
+      rows.push( equipamentos.filter(e=>e.row == c+1 && typeof e.col == 'undefined').length )
+    }
+
+    const equipamentosSelecionadosNoMapa = this.state.selections.length == 0 ? this.state.appState.equipamentos :
+        this.state.appState.equipamentos.filter(e=> this.state.selections.filter(s=>s.col === e.col && s.row === e.row ).length );
+
+    const equipamentosSelecionados = equipamentosSelecionadosNoMapa.filter(g=>
+        this.state.selected.length == 0 ||
+        this.state.selected.indexOf(g.uid)!= -1);
+
     return (
       <View style={styles.container} pagingEnabled={false}>
         <View style={styles.area}>
-          
+          <Mapa />
         </View>
         
 
         <View  style={styles.listaDeEquipamentos}>
-        <ScrollView style={{backgroundColor:'green',flex:-1}}>
-        <Text>
-        {this.state.isScrollEnable?'enabled':'disabled'}
-1        </Text>
+        <ScrollView>
+        {/* <Text> {this.state.isScrollEnable?'enabled':'disabled'} 1        </Text> */}
         </ScrollView>
           <View
-          onPress={()=>{}}
-          style={{position:'absolute',right:0,bottom:0,backgroundColor:'red',
-          textAlign: 'right', 
-          backgroundColor: 'blue',
-          width: 40,
-          height:34
+            onPress={()=>{}}
+            style={{position:'absolute',right:0,bottom:0,
+            textAlign: 'right', 
+            width: 40,
+            height:34
           }}>
           <TouchableWithoutFeedback onPress={()=>{}} style={{width:'40',height:34}}>
             <Text style={{fontSize:25,textAlign:'center',fontWeight:'bold'}}>+</Text>
@@ -303,7 +329,7 @@ export default class EquipamentosScreen extends React.Component {
           pagingEnabled={false}
           >
           <View style={{flex: 1, flexDirection: 'row'}}>
-            {this.state.appState && this.state.appState.equipamentos && this.state.appState.equipamentos.map((e,k)=> <Equipamento 
+            {equipamentosSelecionados && equipamentosSelecionados.map((e,k)=> <Equipamento 
               first={k==0}
               key={e.uid}
               onDown={()=>this.setState({isScrollEnable:false})}
